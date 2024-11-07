@@ -523,17 +523,43 @@ class DataCenterReader:
 
     def _read_string_table(self, reader):
         """Lecture de la table des chaînes"""
-        # Sauvegarde de la position actuelle
-        original_pos = reader.offset
+        string_count = reader.read_int32()
+        print(f"Nombre de chaînes déclaré: {string_count}")
         
-        try:
-            self._string_table.read(reader)
-        except Exception as e:
-            # En cas d'erreur, on essaie de lire à partir du prochain alignement 4 octets
-            print(f"Première tentative échouée: {e}")
-            reader.seek(original_pos + (4 - (original_pos % 4)))
-            print(f"Nouvelle tentative à la position {reader.offset}")
-            self._string_table.read(reader)
+        # Validation de la taille
+        if string_count < 0 or string_count > 1000000:  # limite raisonnable
+            print(f"Warning: Nombre de chaînes suspect ({string_count}), ajustement...")
+            string_count = min(string_count & 0xFFFF, 1000000)  # utilise les 16 bits de poids faible
+        
+        strings = []
+        for i in range(string_count):
+            try:
+                offset = reader.read_int32()
+                if offset < 0:
+                    print(f"Warning: Offset négatif détecté à l'index {i}: {offset}")
+                    continue
+                    
+                length = reader.read_int32()
+                if length < 0 or length > 1000000:  # limite raisonnable
+                    print(f"Warning: Longueur invalide à l'index {i}: {length}")
+                    continue
+                    
+                data = reader.read_bytes(length)
+                try:
+                    string = data.decode('utf-8')
+                    strings.append(string)
+                except UnicodeDecodeError:
+                    print(f"Warning: Erreur de décodage UTF-8 pour la chaîne {i}")
+                    strings.append(f"[Invalid UTF-8 string {i}]")
+            except Exception as e:
+                print(f"Erreur lors de la lecture de la chaîne {i}: {e}")
+                break
+                
+        print(f"Nombre de chaînes lues avec succès: {len(strings)}")
+        self._string_table = strings
+        
+        # Ajouter le dump des chaînes
+        self.dump_string_table()
 
     def _build_tree(self):
         """Construction de l'arbre à partir des données lues"""
@@ -552,9 +578,22 @@ class DataCenterReader:
     def _process_node(self, parent_node, raw_node):
         """Traitement récursif des nœuds avec gestion améliorée des erreurs et validations"""
         try:
-            # Validation et lecture du nom du nœud
+            """Validation d'un nœud avant traitement"""
+            if not isinstance(raw_node, dict):
+                print(f"Type de nœud invalide: {type(raw_node)}")
+                raise ValueError("Le nœud doit être un dictionnaire")
+                
             if 'name_index' not in raw_node:
+                print(f"Debug - Contenu du nœud: {raw_node}")
                 raise ValueError("Le nœud n'a pas de name_index")
+                
+            if not hasattr(self, '_string_table'):
+                print("Table des chaînes non initialisée")
+                raise ValueError("Table des chaînes manquante")
+                
+            if raw_node['name_index'] < 0 or raw_node['name_index'] >= len(self._string_table):
+                print(f"name_index {raw_node['name_index']} hors limites (max: {len(self._string_table)-1})")
+                raise ValueError(f"name_index invalide: {raw_node['name_index']}")
                 
             try:
                 name = self._string_table.get_string(raw_node['name_index'])
@@ -663,3 +702,33 @@ class DataCenterReader:
     def get_string(self, index):
         """Récupération d'une chaîne dans la table des chaînes"""
         return self._string_table.get_string(index)
+    
+    def dump_string_table(self):
+        """Affiche les premières chaînes de la table pour debug"""
+        print("\nDump de la table des chaînes:")
+        for i, string in enumerate(self._string_table):
+            if i < 10:  # Affiche les 10 premières chaînes
+                print(f"String[{i}] = {repr(string)}")
+
+    def _read_node_segments(self, reader):
+        """Lecture des segments de nœuds"""
+        segment_count = reader.read_int32()
+        print(f"Nombre initial de segments: {segment_count}")
+        
+        # Validation et correction
+        if segment_count < 0 or segment_count > 1000000:
+            corrected_count = segment_count & 0xFFFF
+            print(f"Correction du nombre de segments: {corrected_count}")
+            segment_count = corrected_count
+        
+        segments = []
+        for i in range(segment_count):
+            try:
+                segment = self._read_node_segment(reader)
+                segments.append(segment)
+            except Exception as e:
+                print(f"Erreur lors de la lecture du segment {i}: {e}")
+                break
+                
+        print(f"Segments lus avec succès: {len(segments)}")
+        return segments

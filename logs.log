@@ -20,64 +20,58 @@ Révision: 387463
 En-tête lu avec succès - Format: V6_x64, Révision: 387463
 
 --- Lecture de la table de chaînes ---
-Nombre de chaînes: 26
-Warning: Offset invalide détecté à l'index 3: 0
-Warning: Offset invalide détecté à l'index 5: 0
-Warning: Offset invalide détecté à l'index 6: 16
-Warning: Offset invalide détecté à l'index 7: 0
-Warning: Offset invalide détecté à l'index 9: 0
-Warning: Offset invalide détecté à l'index 11: 0
-Warning: Offset invalide détecté à l'index 12: 68
-Warning: Offset invalide détecté à l'index 13: 0
-Warning: Offset invalide détecté à l'index 14: 1188
-Warning: Offset invalide détecté à l'index 15: 0
-Warning: Offset invalide détecté à l'index 16: 1238
-Warning: Offset invalide détecté à l'index 17: 0
-Warning: Offset invalide détecté à l'index 18: 1291
-Warning: Offset invalide détecté à l'index 19: 0
-Warning: Offset invalide détecté à l'index 20: 1313
-Warning: Offset invalide détecté à l'index 21: 0
-Warning: Offset invalide détecté à l'index 22: 1745
-Warning: Offset invalide détecté à l'index 23: 0
-Warning: Offset invalide détecté à l'index 24: 820
-Warning: Offset invalide détecté à l'index 25: 0
-Warning: Erreur de décodage UTF-8 pour la chaîne 1
-Warning: Longueur de chaîne invalide à l'index 3: 196690
-Warning: Longueur de chaîne invalide à l'index 4: 4259947
-Warning: Longueur de chaîne invalide à l'index 5: 1134229948
-Lecture de 6 chaînes terminée
+Nombre de chaînes déclaré: 26
+Warning: Erreur de décodage UTF-8 pour la chaîne 23
+Warning: Longueur invalide à l'index 24: 1466112
+Warning: Erreur de décodage UTF-8 pour la chaîne 25
+Nombre de chaînes lues avec succès: 25
+
+Dump de la table des chaînes:
+String[0] = ''
+String[1] = ''
+String[2] = ''
+String[3] = ''
+String[4] = ''
+String[5] = ''
+String[6] = ''
+String[7] = ''
+String[8] = ''
+String[9] = ''
 
 --- Lecture des clés ---
-Position actuelle: 189
-Position actuelle: 189/1138686774
-Octets disponibles: 1138686585
-Prochains octets: 00030000000000440003000000000044
-Checking magic at offset 189: 0x00000300
-Final key count: 768
-Key 0: 0x44000000
-Key 1: 0x00000300
-Key 2: 0x44000000
-Key 3: 0x00093D00
-Key 4: 0x1B000000
-Successfully read 768 keys
+Position actuelle: 215031
+Position actuelle: 215031/1138686774
+Octets disponibles: 1138471743
+Prochains octets: 000400cf27000000000000000006001b
+Checking magic at offset 215031: 0xCF000400
+Checking magic at offset 215032: 0x27CF0004
+Checking magic at offset 215033: 0x0027CF00
+Checking magic at offset 215034: 0x000027CF
+Checking magic at offset 215035: 0x00000027
+Final key count: 39
+Key 0: 0x00000000
+Key 1: 0x1B000600
+Key 2: 0x65000041
+Key 3: 0x00000000
+Key 4: 0x05000700
+Successfully read 39 keys
 
-Position avant les nœuds: 3265
-Octets: 000000150001002ffe0000000000001d
+Position avant les nœuds: 215195
+Octets: 00000000002d00010034000000000000
 
 --- Lecture des nœuds ---
-Position avant lecture des segments: 3269
-Nombre de segments à lire: 352321536
-Attempting with 16-bit count: 0
-Using alternative count: 5376
-Final segment count to read: 5376
-Successfully read 5376 valid segments
+Position avant lecture des segments: 215199
+Nombre de segments à lire: 0
+Using alternative count: 11520
+Final segment count to read: 11520
+Successfully read 11520 valid segments
 
 --- Lecture des attributs ---
-Position avant lecture des segments: 67787
-Nombre de segments à lire: 654311456
-Attempting with 16-bit count: 32
-Final segment count to read: 32
-Successfully read 32 valid segments
+Position avant lecture des segments: 353447
+Nombre de segments à lire: 6144
+Final segment count to read: 6144
+Successfully read 6144 valid segments
+Debug - Contenu du nœud: {'child_count': 13312, 'attribute_count': 0, 'child_address': {'segment_index': 0, 'element_index': 0}, 'attribute_address': {'segment_index': 11776, 'element_index': 28416}}
 Erreur critique lors du traitement du nœud: Le nœud n'a pas de name_index
 Root Node Name: DataCenter
 Root Node Value: None
