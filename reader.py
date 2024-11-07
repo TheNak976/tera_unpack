@@ -140,12 +140,9 @@ class DataCenterStringTable:
             for i in range(self.count):
                 offset = reader.read_uint32()
                 # Validation de l'offset
-                if offset < last_offset:
-                    print(f"Warning: Offset invalide détecté à l'index {i}: {offset} < {last_offset}")
-                    offset = last_offset
-                if offset > reader.length:
-                    print(f"Warning: Offset trop grand détecté à l'index {i}: {offset} > {reader.length}")
-                    break
+                if offset < last_offset or offset > reader.length:
+                    print(f"Warning: Offset invalide détecté à l'index {i}: {offset}")
+                    continue
                 offsets.append(offset)
                 last_offset = offset
 
@@ -190,7 +187,6 @@ class DataCenterStringTable:
                         self.strings.append(string)
                     except UnicodeDecodeError:
                         print(f"Warning: Erreur de décodage UTF-8 pour la chaîne {i}")
-                        # Tentative de décodage avec remplacement des caractères invalides
                         string = string_data.decode('utf-8', errors='replace')
                         self.strings.append(string)
 
@@ -577,7 +573,8 @@ class DataCenterReader:
             
             try:
                 child_raw = self._nodes.get_element(child_addr)
-                child_node = DataCenterNode()
+                child_name = self._string_table.get_string(child_raw['name_index'])
+                child_node = DataCenterNode(name=child_name)  # Ajouter un nom par défaut ici
                 self._process_node(child_node, child_raw)
                 parent_node.children.append(child_node)
             except Exception as e:
