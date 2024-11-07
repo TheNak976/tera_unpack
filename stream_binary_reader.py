@@ -6,6 +6,13 @@ class StreamBinaryReader:
         self.offset = 0
         self.length = len(data)
 
+    def peek_bytes(self, length):
+        """Lit des octets sans avancer le pointeur"""
+        if self.offset + length > self.length:
+            raise EOFError(f"Tentative de lecture au-delà de la fin du flux: position {self.offset}, demandé {length} octets, disponible {self.length - self.offset}")
+        
+        return self.data[self.offset:self.offset + length]
+
     def read_bytes(self, length):
         if self.offset + length > self.length:
             raise EOFError(f"Tentative de lecture au-delà de la fin du flux: position {self.offset}, demandé {length} octets, disponible {self.length - self.offset}")
@@ -66,6 +73,22 @@ class StreamBinaryReader:
                 break
             result.append(chr(char))
         return ''.join(result)
+
+    def read_until_null(self):
+        """Lit les octets jusqu'à trouver un octet nul"""
+        result = bytearray()
+        while self.can_read(1):
+            byte = self.read_byte()
+            if byte == 0:
+                break
+            result.append(byte)
+        return bytes(result)
+
+    def seek(self, offset):
+        """Déplace le pointeur à la position spécifiée"""
+        if offset < 0 or offset > self.length:
+            raise ValueError(f"Position invalide: {offset}")
+        self.offset = offset
 
     def skip(self, count):
         if count < 0:
