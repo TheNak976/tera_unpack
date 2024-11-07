@@ -550,35 +550,95 @@ class DataCenterReader:
         return root
 
     def _process_node(self, parent_node, raw_node):
-        """Traitement récursif des nœuds"""
-        # Lecture des attributs
-        for i in range(raw_node['attribute_count']):
-            addr = raw_node['attribute_address']
-            attr_addr = {'segment_index': addr['segment_index'],
-                        'element_index': addr['element_index'] + i}
-            
+        """Traitement récursif des nœuds avec gestion améliorée des erreurs et validations"""
+        try:
+            # Validation et lecture du nom du nœud
+            if 'name_index' not in raw_node:
+                raise ValueError("Le nœud n'a pas de name_index")
+                
             try:
-                attr = self._attributes.get_element(attr_addr)
-                name = self._string_table.get_string(attr['name_index'])
-                value = self._process_attribute_value(attr)
-                parent_node.attributes[name] = value
+                name = self._string_table.get_string(raw_node['name_index'])
+                if not name:
+                    raise ValueError(f"name_index invalide: {raw_node['name_index']}")
+                parent_node.name = name
             except Exception as e:
-                print(f"Erreur lors de la lecture de l'attribut {i}: {e}")
+                print(f"Avertissement: Impossible de lire le nom du nœud (index={raw_node['name_index']}): {e}")
+                parent_node.name = f"UnknownNode_{raw_node['name_index']}"
 
-        # Lecture des enfants
-        for i in range(raw_node['child_count']):
-            addr = raw_node['child_address']
-            child_addr = {'segment_index': addr['segment_index'],
-                        'element_index': addr['element_index'] + i}
-            
-            try:
-                child_raw = self._nodes.get_element(child_addr)
-                child_name = self._string_table.get_string(child_raw['name_index'])
-                child_node = DataCenterNode(name=child_name)  # Ajouter un nom par défaut ici
-                self._process_node(child_node, child_raw)
-                parent_node.children.append(child_node)
-            except Exception as e:
-                print(f"Erreur lors de la lecture du nœud enfant {i}: {e}")
+            # Validation des adresses et compteurs
+            max_element_index = len(self._attributes) - 1 if self._attributes else 0
+            attr_start = raw_node['attribute_address']['element_index']
+            attr_count = raw_node['attribute_count']
+
+            if attr_start + attr_count > max_element_index:
+                print(f"Avertissement: Nombre d'attributs ajusté de {attr_count} à {max_element_index - attr_start}")
+                attr_count = max(0, max_element_index - attr_start)
+
+            # Lecture des attributs
+            for i in range(attr_count):
+                addr = raw_node['attribute_address']
+                attr_addr = {
+                    'segment_index': addr['segment_index'],
+                    'element_index': addr['element_index'] + i
+                }
+                
+                try:
+                    attr = self._attributes.get_element(attr_addr)
+                    if attr is None:
+                        raise ValueError(f"Attribut non trouvé à l'adresse {attr_addr}")
+
+                    name = self._string_table.get_string(attr['name_index'])
+                    if not name:
+                        raise ValueError(f"Nom d'attribut invalide (index={attr['name_index']})")
+
+                    value = self._process_attribute_value(attr)
+                    parent_node.attributes[name] = value
+                except Exception as e:
+                    print(f"Erreur lors de la lecture de l'attribut {i}: {e}")
+
+            # Validation et lecture des nœuds enfants
+            max_node_index = len(self._nodes) - 1 if self._nodes else 0
+            child_start = raw_node['child_address']['element_index']
+            child_count = raw_node['child_count']
+
+            if child_start + child_count > max_node_index:
+                print(f"Avertissement: Nombre d'enfants ajusté de {child_count} à {max_node_index - child_start}")
+                child_count = max(0, max_node_index - child_start)
+
+            # Lecture des enfants
+            for i in range(child_count):
+                addr = raw_node['child_address']
+                child_addr = {
+                    'segment_index': addr['segment_index'],
+                    'element_index': addr['element_index'] + i
+                }
+                
+                try:
+                    child_raw = self._nodes.get_element(child_addr)
+                    if child_raw is None:
+                        raise ValueError(f"Nœud enfant non trouvé à l'adresse {child_addr}")
+
+                    child_node = DataCenterNode()
+                    self._process_node(child_node, child_raw)
+                    parent_node.children.append(child_node)
+                    child_node.parent = parent_node  # Établir la relation parent-enfant
+                except Exception as e:
+                    print(f"Erreur lors de la lecture du nœud enfant {i} (adresse={child_addr}): {e}")
+
+            # Gestion des clés si présentes
+            if 'keys_info' in raw_node:
+                try:
+                    keys = self._keys.get_keys((raw_node['keys_info'] & 0b1111111111110000) >> 4)
+                    if keys:
+                        parent_node.keys = keys
+                except Exception as e:
+                    print(f"Erreur lors de la lecture des clés: {e}")
+
+        except Exception as e:
+            print(f"Erreur critique lors du traitement du nœud: {e}")
+            # On conserve le nœud même en cas d'erreur pour maintenir la structure
+            if not parent_node.name:
+                parent_node.name = "ErrorNode"
 
     def _process_attribute_value(self, attr):
         """Traitement de la valeur d'un attribut selon son type"""
