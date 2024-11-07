@@ -231,28 +231,72 @@ class DataCenterSegmentedRegion:
         print(f"Position avant lecture des segments: {reader.offset}")
         print(f"Nombre de segments à lire: {count}")
         
-        # Vérification de validité
-        if count > 1000000:  # Limite raisonnable
-            raise ValueError(f"Nombre de segments invalide: {count}")
+        # More robust validation with recovery attempts
+        if count > 1000000:  # If count is too large
+            # Try reading as 16-bit value
+            reader.seek(reader.offset - 4)  # Go back 4 bytes
+            count = reader.read_uint16()
+            print(f"Attempting with 16-bit count: {count}")
+            
+            if count > 100000:  # Still too large
+                # Try next 16 bits
+                count = reader.read_uint16()
+                print(f"Attempting with next 16-bit count: {count}")
+                
+                if count > 100000:  # If still invalid
+                    # Try using a reasonable default based on file size
+                    count = min(10000, (reader.length - reader.offset) // 16)
+                    print(f"Using estimated count based on file size: {count}")
         
-        # Debug : affichage des octets suivants
-        print("Aperçu des prochains octets:")
-        try:
-            preview_bytes = reader.peek_bytes(16)
-            print(f"Bytes: {preview_bytes.hex()}")
-        except:
-            print("Impossible de lire les octets suivants")
-
+        if count == 0:
+            # Try reading next value as potential count
+            next_count = reader.peek_uint32() & 0xFFFF  # Take only lower 16 bits
+            if 0 < next_count < 100000:
+                print(f"Using alternative count: {next_count}")
+                reader.skip(4)
+                count = next_count
+            else:
+                raise ValueError(f"Invalid segment count: {count}")
+        
+        # Debug info
+        print(f"Final segment count to read: {count}")
+        
         self.segments = []
         self.count = count
 
-        # Lecture de chaque segment
+        # Read segments with additional validation
+        valid_segments = 0
         for i in range(count):
             try:
+                if not reader.can_read(8):  # Minimum size for a segment
+                    print(f"Cannot read more segments, stopping at {i}")
+                    break
+                    
                 segment = self._read_segment(reader, architecture)
-                self.segments.append(segment)
-            except EOFError as e:
-                raise EOFError(f"Erreur lors de la lecture du segment {i}/{count}: {e}")
+                
+                # Basic validation of segment data
+                if (segment['child_count'] < 1000000 and 
+                    segment['attribute_count'] < 1000000 and
+                    segment['child_address']['segment_index'] < 100000 and
+                    segment['attribute_address']['segment_index'] < 100000):
+                    self.segments.append(segment)
+                    valid_segments += 1
+                else:
+                    print(f"Skipping invalid segment at index {i}")
+                    
+                if valid_segments >= 100000:  # Safety limit
+                    print("Reached maximum segment limit")
+                    break
+                    
+            except EOFError:
+                print(f"Reached EOF at segment {i}")
+                break
+            except Exception as e:
+                print(f"Error reading segment {i}: {e}")
+                break
+        
+        print(f"Successfully read {valid_segments} valid segments")
+        return valid_segments > 0
 
     def _read_segment(self, reader, architecture):
         """Lecture d'un segment individuel"""
@@ -349,27 +393,43 @@ class DataCenterReader:
         print(f"Taille totale des données : {len(data)} octets")
 
         try:
+            # Lecture de l'en-tête
             print("\n--- Lecture de l'en-tête ---")
             self._read_header(reader)
 
+            # Lecture de la table des chaînes en premier
+            print("\n--- Lecture de la table de chaînes ---")
+            self._read_string_table(reader)
+            if len(self._string_table) == 0:
+                raise ValueError("Table de chaînes vide")
+
+            # Lecture des clés
             print("\n--- Lecture des clés ---")
             self._read_keys(reader)
 
-            print("\n--- Lecture des attributs ---")
-            self._attributes.read(reader, architecture)
+            # Détermination de la position des nœuds
+            node_position = reader.offset
+            print(f"\nPosition avant les nœuds: {node_position}")
+            print(f"Octets: {reader.peek_bytes(16).hex()}")
 
+            # Lecture des nœuds
             print("\n--- Lecture des nœuds ---")
             self._nodes.read(reader, architecture)
+            if len(self._nodes) == 0:
+                raise ValueError("Aucun nœud trouvé")
 
-            print("\n--- Lecture de la table de chaînes ---")
-            self._read_string_table(reader)
+            # Lecture des attributs après avoir vérifié les nœuds
+            print("\n--- Lecture des attributs ---")
+            self._attributes.read(reader, architecture)
 
             return self._build_tree()
 
         except EOFError as e:
+            print(f"DEBUG - Position finale: {reader.offset}/{reader.length}")
             raise EOFError(f"Fin de fichier inattendue: {str(e)}")
         except Exception as e:
-            raise ValueError(f"Erreur lors de l'analyse des données: {str(e)}")
+            print(f"DEBUG - Erreur à la position: {reader.offset}/{reader.length}")
+            raise ValueError(f"Erreur lors de l'analyse: {str(e)}")
 
     def _read_header(self, reader):
         """Lecture de l'en-tête du fichier"""
@@ -422,7 +482,17 @@ class DataCenterReader:
 
     def _read_string_table(self, reader):
         """Lecture de la table des chaînes"""
-        self._string_table.read(reader)
+        # Sauvegarde de la position actuelle
+        original_pos = reader.offset
+        
+        try:
+            self._string_table.read(reader)
+        except Exception as e:
+            # En cas d'erreur, on essaie de lire à partir du prochain alignement 4 octets
+            print(f"Première tentative échouée: {e}")
+            reader.seek(original_pos + (4 - (original_pos % 4)))
+            print(f"Nouvelle tentative à la position {reader.offset}")
+            self._string_table.read(reader)
 
     def _build_tree(self):
         """Construction de l'arbre à partir des données lues"""
