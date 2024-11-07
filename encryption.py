@@ -5,7 +5,7 @@ from Crypto.Cipher import AES
 def create_cipher(key, iv):
     key_bytes = bytes.fromhex(key)  # Convert key to bytes
     iv_bytes = bytes.fromhex(iv)    # Convert iv to bytes
-    return AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
+    return AES.new(key_bytes, AES.MODE_CFB, iv_bytes)
 
 def decrypt_data(cipher, data):
     if not data:

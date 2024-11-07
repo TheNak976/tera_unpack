@@ -24,49 +24,53 @@ class DataCenterKeys:
         self.keys = []
         
     def read(self, reader, architecture):
-        # Vérification de la signature magique ou de l'en-tête attendu
-        magic = reader.peek_uint32()
-        print(f"Signature magique des clés: 0x{magic:08X}")
+        # Try to find a valid magic number within the next few bytes
+        valid_magic_found = False
+        original_position = reader.offset
         
-        # Vérifie si le nombre est raisonnable (par exemple, moins de 100000)
-        if magic > 100000:
-            print("Avertissement: Le nombre de clés semble invalide, tentative de correction...")
-            # Essayons de trouver un nombre plus raisonnable dans les octets suivants
-            for i in range(4):
-                reader.skip(1)
-                magic = reader.peek_uint32()
-                if magic is not None and magic < 100000:
-                    print(f"Nouveau nombre de clés trouvé: {magic}")
-                    break
-            else:
-                raise ValueError("Impossible de trouver un nombre de clés valide")
+        for i in range(8):  # Try up to 8 different positions
+            magic = reader.peek_uint32()
+            print(f"Checking magic at offset {reader.offset}: 0x{magic:08X}")
+            
+            # Check if magic number looks reasonable (less than 10000)
+            if 0 < magic < 10000:
+                valid_magic_found = True
+                break
+                
+            reader.skip(1)
+            
+        if not valid_magic_found:
+            reader.offset = original_position  # Reset position
+            # Try alternative approach - assume small number
+            count = reader.read_uint32() & 0xFFFF  # Take only lower 16 bits
+            if count > 10000:
+                count = count & 0xFF  # Try even smaller number if still too large
+        else:
+            count = reader.read_uint32()
         
-        count = reader.read_uint32()
-        print(f"Lecture de {count} clés...")
+        print(f"Final key count: {count}")
         
-        if count > 100000:  # Une limite raisonnable
-            raise ValueError(f"Nombre de clés trop élevé: {count}")
+        if count == 0 or count > 10000:
+            raise ValueError(f"Invalid key count: {count}")
             
         try:
             self.keys = []
             for i in range(count):
                 if not reader.can_read(4):
-                    print(f"Fin des données atteinte après {i} clés")
                     break
                 key = reader.read_uint32()
                 self.keys.append(key)
-                
-                # Debug : affiche les premières clés
-                if i < 5:
-                    print(f"Clé {i}: 0x{key:08X}")
+                if i < 5:  # Debug first few keys
+                    print(f"Key {i}: 0x{key:08X}")
                     
         except EOFError as e:
-            print(f"Fin prématurée des données après {len(self.keys)} clés")
             if len(self.keys) == 0:
-                raise
-        
-        print(f"Lecture terminée : {len(self.keys)} clés lues")
-        
+                raise ValueError("No valid keys could be read") from e
+            print(f"Warning: Only read {len(self.keys)} of {count} keys")
+            
+        print(f"Successfully read {len(self.keys)} keys")
+        return len(self.keys) > 0
+
     def populate(self):
         # Implémentation de populate si nécessaire
         pass

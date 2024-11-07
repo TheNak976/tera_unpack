@@ -11,7 +11,7 @@ options = {
 }
 
 # Chemin vers le fichier de données que vous souhaitez analyser
-file_path = 'C:/Users/acyho/Downloads/data/DataCenter_Final_EUR.dat'
+file_path = 'C:/Users/acyho/Downloads/data/tera_unpack/DataCenter_Final_EUR.dat'
 
 # Initialisation et utilisation de DataCenterReader
 reader = DataCenterReader(options)
