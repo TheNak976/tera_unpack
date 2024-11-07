@@ -1,0 +1,4 @@
+
+*.dat
+/__pycache__
+debug_decrypted.bin
