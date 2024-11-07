@@ -1,0 +1,154 @@
+Length of encrypted data: 120374534
+Decryption successful
+Decrypted data (first 100 bytes): b'6\xfb\xdeCx\x9c\xec\x9d\r\x9cUS\xf7\xc7\x7f\xf7\xde\x99\xb93\xbd\xcd\xd4TSMcbz\xa1I\xc5x\x84"\x84\x10\x06a(J\rR\x83"Dy\xeb\x85\xe9\x05!\x14!5\x88B\x14\x85\xa1P\x89\x8a\x89\x10B\xc8\xdb\x14B\xde\xa3\x9e}f\xe6\xaesw\x9d3\xe7\xecs\xf7\xbe\xe7\x9c[\xcf\xff\xf3\x7f\xf4\x8c\xd3\x99\xfd]k'
+Premiers octets du fichier chiffré: 26484d495c5dd3079b0b727a1bb90703
+Premiers octets après déchiffrement: 36fbde43789cec9d0d9c5553f7c77ff7
+Format d'en-tête: 789c
+Marqueur début données: ec9d0d9c
+Signature des données: 36fbde43789cec9d
+Taille attendue après décompression: 1138686774
+En-tête compression: 789c
+Taille données compressées: 120374528
+Decompressed data (first 100 bytes): b'\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf0\xbf\x87\xe9\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1a\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x001\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00\x83\x00\x03\x00\x00\x00\x00\x00\xee\x00D\x00\x00\x00\x00\x00D\x00\x00\x00\x00\x00\x00\x00\xa4\x04\x00\x00\x00\x00\x00\x00'
+=== Début de l'analyse ===
+Taille totale des données : 1138686774 octets
+
+--- Lecture de l'en-tête ---
+Format détecté: V6_x64
+Timestamp: -1.0
+Révision: 387463
+En-tête lu avec succès - Format: V6_x64, Révision: 387463
+
+--- Lecture de la table de chaînes ---
+Nombre de chaînes: 26
+Warning: Offset invalide détecté à l'index 3: 0 < 3
+Warning: Offset invalide détecté à l'index 5: 0 < 49
+Warning: Offset invalide détecté à l'index 6: 16 < 49
+Warning: Offset invalide détecté à l'index 7: 0 < 49
+Warning: Offset invalide détecté à l'index 9: 0 < 196739
+Warning: Offset invalide détecté à l'index 11: 0 < 4456686
+Warning: Offset invalide détecté à l'index 12: 68 < 4456686
+Warning: Offset invalide détecté à l'index 13: 0 < 4456686
+Warning: Offset invalide détecté à l'index 14: 1188 < 4456686
+Warning: Offset invalide détecté à l'index 15: 0 < 4456686
+Warning: Offset invalide détecté à l'index 16: 1238 < 4456686
+Warning: Offset invalide détecté à l'index 17: 0 < 4456686
+Warning: Offset invalide détecté à l'index 18: 1291 < 4456686
+Warning: Offset invalide détecté à l'index 19: 0 < 4456686
+Warning: Offset invalide détecté à l'index 20: 1313 < 4456686
+Warning: Offset invalide détecté à l'index 21: 0 < 4456686
+Warning: Offset invalide détecté à l'index 22: 1745 < 4456686
+Warning: Offset invalide détecté à l'index 23: 0 < 4456686
+Warning: Offset invalide détecté à l'index 24: 820 < 4456686
+Warning: Offset invalide détecté à l'index 25: 0 < 4456686
+Warning: Erreur de décodage UTF-8 pour la chaîne 1
+Warning: Longueur de chaîne invalide à l'index 7: 196690
+Warning: Longueur de chaîne invalide à l'index 9: 4259947
+Warning: Longueur de chaîne invalide à l'index 25: 1134229948
+Lecture de 26 chaînes terminée
+
+--- Lecture des clés ---
+Position actuelle: 4456826
+Position actuelle: 4456826/1138686774
+Octets disponibles: 1134229948
+Prochains octets: d20e000000002d0033220200740d0000
+Checking magic at offset 4456826: 0x00000ED2
+Final key count: 3794
+Key 0: 0x002D0000
+Key 1: 0x00022233
+Key 2: 0x00000D74
+Key 3: 0x00470000
+Key 4: 0x0002802F
+Successfully read 3794 keys
+
+Position avant les nœuds: 4472006
+Octets: 740d0000000047002f8002007b0d0000
+
+--- Lecture des nœuds ---
+Position avant lecture des segments: 4472010
+Nombre de segments à lire: 3444
+Final segment count to read: 3444
+Successfully read 3444 valid segments
+
+--- Lecture des attributs ---
+Position avant lecture des segments: 4513342
+Nombre de segments à lire: 4784128
+Attempting with 16-bit count: 0
+Using alternative count: 73
+Final segment count to read: 73
+Successfully read 73 valid segments
+Erreur lors de la lecture de l'attribut 0: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 1: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 2: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 3: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 4: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 5: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 6: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 7: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 8: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 9: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 10: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 11: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 12: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 13: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 14: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 15: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 16: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 17: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 18: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 19: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 20: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 21: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 22: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 23: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 24: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 25: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 26: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 27: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 28: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 29: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 30: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 31: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 32: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 33: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 34: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 35: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 36: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 37: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 38: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 39: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 40: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 41: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 42: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 43: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 44: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 45: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 46: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 47: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 48: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 49: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 50: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 51: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 52: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 53: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 54: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 55: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 56: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 57: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 58: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 59: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 60: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 61: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 62: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 63: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 64: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 65: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 66: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 67: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 68: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 69: Index de segment invalide: 3451
+Erreur lors de la lecture de l'attribut 70: Index de segment invalide: 3451
+Root Node Name: DataCenter
+Root Node Value: None
+Root Node Attributes: {}
+Root Node Children: []

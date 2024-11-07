@@ -1,5 +1,5 @@
-from encryption import create_cipher, decrypt_data
 from reader import DataCenterReader
+from encryption import create_cipher, decrypt_data
 from compression import decompress_data
 
 # Options de configuration pour DataCenterReader
@@ -37,7 +37,6 @@ print(f"Premiers octets après déchiffrement: {decrypted_data[:16].hex()}")
 # Debug supplémentaire
 print(f"Format d'en-tête: {decrypted_data[4:6].hex()}")
 print(f"Marqueur début données: {decrypted_data[6:10].hex()}")
-
 
 
 with open('debug_decrypted.bin', 'wb') as f:

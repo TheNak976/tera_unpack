@@ -1,4 +1,5 @@
 import struct
+from data_center_format import DataCenterFormat
 from stream_binary_reader import StreamBinaryReader
 from encryption import create_cipher, decrypt_data
 from compression import decompress_data
@@ -180,7 +181,7 @@ class DataCenterStringTable:
                     
                     # Troncature au premier octet nul si présent
                     null_pos = string_data.find(b'\0')
-                    if null_pos != -1:
+                    if (null_pos != -1):
                         string_data = string_data[:null_pos]
 
                     # Décodage de la chaîne
@@ -368,12 +369,20 @@ class DataCenterAddress:
 
 class DataCenterReader:
     def __init__(self, options):
-        self._strict = options.get('strict', True)
-        self._architecture = options.get('architecture', 'x64').lower()
+        self.architecture = options.get('architecture', 'x64')
+        self.strict = options.get('strict', True)
+        self.format = None
+        self.timestamp = 0.0
+        self.revision = 0
+        self.unknown_value1 = 0
+        self.unknown_value2 = 0
+        self.unknown_value3 = 0
+        self.unknown_value4 = 0
+        self.unknown_value5 = 0
 
         # Vérification de l'architecture
-        if self._architecture not in ['x86', 'x64']:
-            raise ValueError(f"Architecture non supportée: {self._architecture}")
+        if self.architecture not in ['x86', 'x64']:
+            raise ValueError(f"Architecture non supportée: {self.architecture}")
         
         # Initialisation des composants
         self._header = DataCenterHeader()
@@ -387,7 +396,7 @@ class DataCenterReader:
             raise ValueError("Données vides")
 
         reader = StreamBinaryReader(data)
-        architecture = self._architecture
+        architecture = self.architecture
 
         print("=== Début de l'analyse ===")
         print(f"Taille totale des données : {len(data)} octets")
@@ -432,44 +441,80 @@ class DataCenterReader:
             raise ValueError(f"Erreur lors de l'analyse: {str(e)}")
 
     def _read_header(self, reader):
-        """Lecture de l'en-tête du fichier"""
-        header = {}
+        """
+        Lit l'en-tête du fichier DataCenter
         
-        # Lecture des données de l'en-tête
-        header['version'] = reader.read_uint32()
-        header['timestamp'] = reader.read_double()
+        Args:
+            reader: StreamBinaryReader pour lire les données
+            
+        Returns:
+            None
+            
+        Raises:
+            ValueError: Si l'en-tête n'est pas valide
+        """
+        try:
+            # Lecture de la version et détermination du format
+            version = reader.read_uint32()
+            self.format = DataCenterFormat.get_format(version, self.architecture)
+            print(f"Format détecté: {self.format.name}")
+
+            # Lecture du timestamp
+            self.timestamp = reader.read_double()
+            print(f"Timestamp: {self.timestamp}")
+
+            # Lecture de la révision pour les formats V6
+            if self.format.is_v6():
+                self.revision = reader.read_uint32()
+                print(f"Révision: {self.revision}")
+            else:
+                self.revision = 0
+
+            # Lecture des valeurs d'en-tête supplémentaires
+            self.unknown_value1 = reader.read_int16()
+            self.unknown_value2 = reader.read_int16()
+            self.unknown_value3 = reader.read_int32()
+            self.unknown_value4 = reader.read_int32()
+            self.unknown_value5 = reader.read_int32()
+
+            # Vérification de la validité de l'en-tête
+            if not self._validate_header():
+                raise ValueError("En-tête invalide: valeurs incorrectes")
+
+            print(f"En-tête lu avec succès - Format: {self.format.name}, Révision: {self.revision}")
+
+        except EOFError as e:
+            raise ValueError(f"Erreur de lecture de l'en-tête: fin de fichier inattendue - {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Erreur lors de la lecture de l'en-tête: {str(e)}")
+
+    def _validate_header(self):
+        """
+        Valide les valeurs de l'en-tête
         
-        print("En-tête:")
-        print(f"Données brutes: {reader.peek_bytes(32).hex()}")
-        
-        # Vérification de la version
-        if header['version'] not in [3, 6]:
-            raise ValueError(f"Version non supportée: {header['version']}")
-        
-        # Vérification du timestamp
-        if self._strict and header['timestamp'] != -1.0:
-            raise ValueError(f"Timestamp invalide: {header['timestamp']}")
-        
-        # Pour la version 6, lecture de la révision
-        if header['version'] == 6:
-            header['revision'] = reader.read_uint32()
-        
-        # Lecture des champs inconnus
-        header['unknown1'] = reader.read_int16()
-        header['unknown2'] = reader.read_int16()
-        header['unknown3'] = reader.read_int32()
-        header['unknown4'] = reader.read_int32()
-        header['unknown5'] = reader.read_int32()
-        
-        # En mode strict, vérification des champs inconnus
-        if self._strict:
-            unknowns = (header['unknown1'], header['unknown2'], 
-                       header['unknown3'], header['unknown4'], 
-                       header['unknown5'])
-            if any(unknowns):
-                raise ValueError(f"Valeurs inconnues non nulles en mode strict: {unknowns}")
-        
-        self._header = header
+        Returns:
+            bool: True si l'en-tête est valide, False sinon
+        """
+        # Vérification du timestamp en mode strict
+        if self.strict and self.timestamp != -1.0:
+            print("Avertissement: timestamp invalide en mode strict")
+            return False
+
+        # Vérification des valeurs inconnues en mode strict
+        if self.strict:
+            unknown_values = [
+                self.unknown_value1,
+                self.unknown_value2,
+                self.unknown_value3,
+                self.unknown_value4,
+                self.unknown_value5
+            ]
+            if any(unknown_values):
+                print("Avertissement: valeurs inconnues non nulles en mode strict")
+                return False
+
+        # Si tout est OK
+        return True
 
     def _read_keys(self, reader):
         """Lecture de la table des clés"""
@@ -478,7 +523,7 @@ class DataCenterReader:
         print(f"Octets disponibles: {reader.length - reader.offset}")
         print(f"Prochains octets: {reader.peek_bytes(16).hex()}")
         
-        self._keys.read(reader, self._architecture)
+        self._keys.read(reader, self.architecture)
 
     def _read_string_table(self, reader):
         """Lecture de la table des chaînes"""
