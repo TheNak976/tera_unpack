@@ -3,7 +3,67 @@ from data_center_format import DataCenterFormat
 from stream_binary_reader import StreamBinaryReader
 from encryption import create_cipher, decrypt_data
 from compression import decompress_data
-from data_structures import DataCenterNode, DataCenterAddress
+from data_structures import (
+    DataCenterConstants,
+    DataCenterStringTable,
+    DataCenterKeys,
+    DataCenterSegmentedRegion,
+    DataCenterRawAttribute,
+    DataCenterRawNode
+)
+
+
+class DataCenterNode:
+    def __init__(self, name, value=None, attributes=None, children=None):
+        self.name = name
+        self.value = value
+        self.attributes = attributes or {}
+        self.children = children or []
+        self.parent = None
+
+        # Validate special attributes
+        if value is not None and name != "__value__":
+            raise ValueError("Only __value__ nodes can have a value")
+            
+
+
+    def get_key_value(self):
+        """Get value of key attributes for sorting"""
+        return 0  # Default sort value
+
+    def sort_children(self, key=None, reverse=False):
+        """Sort children by name and key attributes"""
+        if key is None:
+            # Sort by name first, then by key values
+            key = lambda x: (x.name, x.get_key_value())
+        self.children.sort(key=key, reverse=reverse)
+
+    def add_child(self, child_node):
+        self.children.append(child_node)
+        child_node.parent = self
+
+    def remove_child(self, child_node):
+        if child_node in self.children:
+            self.children.remove(child_node)
+            child_node.parent = None
+
+    def clear_children(self):
+        for child in self.children:
+            child.parent = None
+        self.children = []
+
+    def reverse_children(self):
+        self.children.reverse()
+
+    def add_attribute(self, name, value, type_code=None):
+        """Add attribute with validation"""
+        if name == VALUE_NODE_NAME and type_code != DataCenterTypeCode.STRING:
+            raise ValueError("__value__ attribute must be string type")
+        self.attributes[name] = value
+
+    def __repr__(self):
+        return f"DataCenterNode(name={self.name}, value={self.value}, attributes={self.attributes}, children={len(self.children)})"
+
 
 class DataCenterHeader:
     def __init__(self):
@@ -221,79 +281,88 @@ class DataCenterSegmentedRegion:
         self.segments = []
         self.count = 0
 
-    def read(self, reader, architecture):
-        # Lecture du nombre de segments
-        count = reader.read_uint32()
-        
-        print(f"Position avant lecture des segments: {reader.offset}")
-        print(f"Nombre de segments à lire: {count}")
-        
-        # More robust validation with recovery attempts
-        if count > 1000000:  # If count is too large
-            # Try reading as 16-bit value
-            reader.seek(reader.offset - 4)  # Go back 4 bytes
-            count = reader.read_uint16()
-            print(f"Attempting with 16-bit count: {count}")
-            
-            if count > 100000:  # Still too large
-                # Try next 16 bits
-                count = reader.read_uint16()
-                print(f"Attempting with next 16-bit count: {count}")
-                
-                if count > 100000:  # If still invalid
-                    # Try using a reasonable default based on file size
-                    count = min(10000, (reader.length - reader.offset) // 16)
-                    print(f"Using estimated count based on file size: {count}")
-        
-        if count == 0:
-            # Try reading next value as potential count
-            next_count = reader.peek_uint32() & 0xFFFF  # Take only lower 16 bits
-            if 0 < next_count < 100000:
-                print(f"Using alternative count: {next_count}")
-                reader.skip(4)
-                count = next_count
-            else:
-                raise ValueError(f"Invalid segment count: {count}")
-        
-        # Debug info
-        print(f"Final segment count to read: {count}")
-        
-        self.segments = []
-        self.count = count
+class DataCenterSegmentedRegion:
+    def __init__(self):
+        self._segments = []
 
-        # Read segments with additional validation
-        valid_segments = 0
-        for i in range(count):
-            try:
-                if not reader.can_read(8):  # Minimum size for a segment
-                    print(f"Cannot read more segments, stopping at {i}")
-                    break
-                    
-                segment = self._read_segment(reader, architecture)
+    def read(self, reader, architecture):
+        """Lit les segments avec validation améliorée"""
+        try:
+            position = reader.offset
+            print(f"Position avant lecture des segments: {position}")
+            
+            count = reader.read_int32()
+            print(f"Nombre de segments à lire: {count}")
+            
+            # Validate count
+            if count < 0 or count > 1000000:
+                print(f"WARNING - Invalid segment count ({count}), using alternate...")
+                count = min(abs(count) & 0xFFFF, 1000000)
+            
+            # Handle 0 count case
+            if count == 0:
+                print("WARNING - No segments to read")
+                self._segments = []
+                return
                 
-                # Basic validation of segment data
-                if (segment['child_count'] < 1000000 and 
-                    segment['attribute_count'] < 1000000 and
-                    segment['child_address']['segment_index'] < 100000 and
-                    segment['attribute_address']['segment_index'] < 100000):
-                    self.segments.append(segment)
-                    valid_segments += 1
-                else:
-                    print(f"Skipping invalid segment at index {i}")
+            print(f"Final segment count to read: {count}")
+            
+            # Read segments with limit
+            MAX_SEGMENTS = 100000
+            read_count = min(count, MAX_SEGMENTS)
+            
+            segments = []
+            for i in range(read_count):
+                try:
+                    segment = self._read_segment(reader, architecture)
+                    if segment:
+                        segments.append(segment)
+                except Exception as e:
+                    print(f"ERROR - Failed to read segment {i}: {e}")
+                    continue
                     
-                if valid_segments >= 100000:  # Safety limit
-                    print("Reached maximum segment limit")
-                    break
-                    
-            except EOFError:
-                print(f"Reached EOF at segment {i}")
-                break
-            except Exception as e:
-                print(f"Error reading segment {i}: {e}")
-                break
-        
-        print(f"Successfully read {valid_segments} valid segments")
-        return valid_segments > 0
+            if read_count < count:
+                print(f"WARNING - Only read {read_count} of {count} segments")
+                
+            print(f"Successfully read {len(segments)} valid segments")
+            self._segments = segments
+
+        except Exception as e:
+            print(f"ERROR - Failed to read segments: {e}")
+            self._segments = []
+
+    def _read_attribute_value(self, reader, architecture):
+        """Lit la valeur d'un attribut selon son type"""
+        try:
+            type_code = reader.read_uint16() & 0x3  # Get bottom 2 bits for base type
+            extended_code = reader.read_uint16() >> 2  # Get remaining bits
+            
+            # Read value based on type
+            if type_code == 1:  # INT
+                if extended_code & 1:  # Boolean
+                    return reader.read_uint8() != 0
+                return reader.read_int32()
+                
+            elif type_code == 2:  # FLOAT
+                return reader.read_float()
+                
+            elif type_code == 3:  # STRING
+                # Read string address
+                segment_index = reader.read_uint16()
+                element_index = reader.read_uint16()
+                return {
+                    'segment_index': segment_index,
+                    'element_index': element_index
+                }
+                
+            else:
+                print(f"WARNING - Unknown type code: {type_code}")
+                return None
+                
+        except Exception as e:
+            print(f"ERROR - Failed to read attribute value: {e}")
+            return None
+
 
     def _read_segment(self, reader, architecture):
         """Lecture d'un segment individuel"""
@@ -331,23 +400,23 @@ class DataCenterSegmentedRegion:
 
     def get_element(self, address):
         """Récupère un élément à partir de son adresse"""
-        if not 0 <= address['segment_index'] < len(self.segments):
+        if not 0 <= address['segment_index'] < len(self._segments):
             raise IndexError(f"Index de segment invalide: {address['segment_index']}")
             
-        segment = self.segments[address['segment_index']]
+        segment = self._segments[address['segment_index']]
         if not 0 <= address['element_index'] < segment.get('child_count', 0):
             raise IndexError(f"Index d'élément invalide: {address['element_index']}")
             
         return segment
 
     def __len__(self):
-        return len(self.segments)
+        return len(self._segments)
 
     def __getitem__(self, index):
-        return self.segments[index]
+        return self._segments[index]
 
     def __iter__(self):
-        return iter(self.segments)
+        return iter(self._segments)
 
 class DataCenterFooter:
     def read(self, reader, strict):
@@ -370,11 +439,16 @@ class DataCenterReader:
         self.format = None
         self.timestamp = 0.0
         self.revision = 0
-        self.unknown_value1 = 0
-        self.unknown_value2 = 0
-        self.unknown_value3 = 0
-        self.unknown_value4 = 0
-        self.unknown_value5 = 0
+        self._header = DataCenterHeader()
+        # Initialize string tables with size limits
+        self._names = DataCenterStringTable(DataCenterConstants.NAME_TABLE_SIZE)
+        self._values = DataCenterStringTable(DataCenterConstants.VALUE_TABLE_SIZE)
+        # Initialize keys with names table reference
+        self._keys = DataCenterKeys(self._names)
+        # Initialize segmented regions with their respective types
+        self._attributes = DataCenterSegmentedRegion(DataCenterRawAttribute)
+        self._nodes = DataCenterSegmentedRegion(DataCenterRawNode)
+        self._options = options
 
         # Vérification de l'architecture
         if self.architecture not in ['x86', 'x64']:
@@ -513,171 +587,240 @@ class DataCenterReader:
         return True
 
     def _read_keys(self, reader):
-        """Lecture de la table des clés"""
-        print(f"Position actuelle: {reader.offset}")
-        print(f"Position actuelle: {reader.offset}/{reader.length}")
-        print(f"Octets disponibles: {reader.length - reader.offset}")
-        print(f"Prochains octets: {reader.peek_bytes(16).hex()}")
-        
-        self._keys.read(reader, self.architecture)
+        """Lecture de la table des clés avec validation améliorée"""
+        try:
+            print(f"Position actuelle: {reader.offset}")
+            print(f"Position actuelle: {reader.offset}/{reader.length}")
+            print(f"Octets disponibles: {reader.length - reader.offset}")
+            print(f"Prochains octets: {reader.peek_bytes(16).hex()}")
+            
+            # Read key count
+            count = reader.read_int32()
+            print(f"DEBUG - Raw key count: {count}")
+            
+            # Validate key count
+            if count < 0 or count > 1000000:
+                print(f"WARNING - Invalid key count ({count}), adjusting...")
+                count = min(abs(count) & 0xFFFF, 1000000)
+                
+            print(f"DEBUG - Adjusted key count: {count}")
+            
+            # Handle case of 0 keys
+            if count == 0:
+                print("WARNING - No keys found, creating default empty key")
+                # Create default key with all fields set to 0
+                default_key = {
+                    'name_index_1': 0,
+                    'name_index_2': 0,
+                    'name_index_3': 0,
+                    'name_index_4': 0
+                }
+                self._keys = [default_key]
+                return
+                
+            # Read keys
+            keys = []
+            for i in range(count):
+                try:
+                    key = {
+                        'name_index_1': reader.read_uint16(),
+                        'name_index_2': reader.read_uint16(),
+                        'name_index_3': reader.read_uint16(),
+                        'name_index_4': reader.read_uint16()
+                    }
+                    keys.append(key)
+                    print(f"DEBUG - Read key {i}: {key}")
+                except Exception as e:
+                    print(f"ERROR - Failed to read key {i}: {e}")
+                    break
+                    
+            self._keys = keys or [default_key]  # Fallback to default if no keys read
+            print(f"Successfully read {len(self._keys)} keys")
+            
+        except Exception as e:
+            print(f"ERROR - Failed to read keys: {e}")
+            # Create default key as fallback
+            self._keys = [{
+                'name_index_1': 0,
+                'name_index_2': 0,
+                'name_index_3': 0,
+                'name_index_4': 0
+            }]
 
     def _read_string_table(self, reader):
-        """Lecture de la table des chaînes"""
-        string_count = reader.read_int32()
-        print(f"Nombre de chaînes déclaré: {string_count}")
+        """Lecture de la table des chaînes avec support UTF-16"""
+        # Initialize with special names (index 0 is empty, 1 is __root__, 2 is __value__)
+        strings = ['', ROOT_NODE_NAME, VALUE_NODE_NAME]
         
-        # Validation de la taille
-        if string_count < 0 or string_count > 1000000:  # limite raisonnable
-            print(f"Warning: Nombre de chaînes suspect ({string_count}), ajustement...")
-            string_count = min(string_count & 0xFFFF, 1000000)  # utilise les 16 bits de poids faible
-        
-        strings = []
-        for i in range(string_count):
-            try:
-                offset = reader.read_int32()
-                if offset < 0:
-                    print(f"Warning: Offset négatif détecté à l'index {i}: {offset}")
-                    continue
-                    
-                length = reader.read_int32()
-                if length < 0 or length > 1000000:  # limite raisonnable
-                    print(f"Warning: Longueur invalide à l'index {i}: {length}")
-                    continue
-                    
-                data = reader.read_bytes(length)
+        try:
+            string_count = reader.read_int32()
+            print(f"Nombre de chaînes déclaré: {string_count}")
+            
+            # Validation de la taille
+            if string_count < 0 or string_count > 1000000:
+                print(f"Warning: Nombre de chaînes suspect ({string_count}), ajustement...")
+                string_count = min(string_count & 0xFFFF, 1000000)
+            
+            for i in range(string_count):
                 try:
-                    string = data.decode('utf-8')
-                    strings.append(string)
-                except UnicodeDecodeError:
-                    print(f"Warning: Erreur de décodage UTF-8 pour la chaîne {i}")
-                    strings.append(f"[Invalid UTF-8 string {i}]")
-            except Exception as e:
-                print(f"Erreur lors de la lecture de la chaîne {i}: {e}")
-                break
-                
-        print(f"Nombre de chaînes lues avec succès: {len(strings)}")
+                    offset = reader.read_int32()
+                    if offset < 0:
+                        print(f"Warning: Offset négatif détecté à l'index {i}: {offset}")
+                        continue
+                        
+                    length = reader.read_int32()
+                    if length < 0 or length > 1000000:
+                        print(f"Warning: Longueur invalide à l'index {i}: {length}")
+                        continue
+                    
+                    # Lecture des données en UTF-16
+                    data = reader.read_bytes(length * 2)  # UTF-16 = 2 bytes per char
+                    try:
+                        string = data.decode('utf-16-le')  # TERA uses little endian
+                        strings.append(string)
+                        print(f"DEBUG - Read string[{i}]: '{string}'")
+                    except UnicodeDecodeError:
+                        print(f"Warning: Erreur de décodage UTF-16 pour la chaîne {i}")
+                        strings.append(f"[Invalid UTF-16 string {i}]")
+                except Exception as e:
+                    print(f"Erreur lors de la lecture de la chaîne {i}: {e}")
+                    print(f"DEBUG - Current reader position: {reader.offset}")
+                    break
+                    
+            print(f"Nombre de chaînes lues avec succès: {len(strings)}")
+            print(f"DEBUG - First 5 strings: {strings[:5]}")
+            
+        except Exception as e:
+            print(f"Error reading string table: {e}")
+            # Ensure we at least have the special names
+            strings = ['', ROOT_NODE_NAME, VALUE_NODE_NAME]
+            
         self._string_table = strings
-        
-        # Ajouter le dump des chaînes
         self.dump_string_table()
 
     def _build_tree(self):
-        """Construction de l'arbre à partir des données lues"""
-        # Création du nœud racine
-        root = DataCenterNode(name="DataCenter", value=None)
-        
-        # Lecture du premier nœud (index 0)
+        """Build tree with improved validation"""
         try:
+            # Initialize root node
+            root = DataCenterNode(name=ROOT_NODE_NAME)
+            
+            if not self._nodes:
+                raise ValueError("No nodes found")
+                    
             first_node = self._nodes[0]
-            self._process_node(root, first_node)
-        except IndexError:
-            raise ValueError("Pas de nœud racine trouvé")
-        
-        return root
-
-    def _process_node(self, parent_node, raw_node):
-        """Traitement récursif des nœuds avec gestion améliorée des erreurs et validations"""
-        try:
-            """Validation d'un nœud avant traitement"""
-            if not isinstance(raw_node, dict):
-                print(f"Type de nœud invalide: {type(raw_node)}")
-                raise ValueError("Le nœud doit être un dictionnaire")
+            print(f"DEBUG - Raw first node: {first_node}")
+            
+            # Normalize node structure
+            normalized_node = {
+                'name_index': 1,  # Index for __root__ in string table
+                'child_count': first_node.get('child_count', 0),
+                'attribute_count': first_node.get('attribute_count', 0),
+                'child_address': self._validate_address(first_node.get('child_address')),
+                'attribute_address': self._validate_address(first_node.get('attribute_address'))
+            }
+            
+            print(f"DEBUG - Normalized node: {normalized_node}")
+            
+            # Process children
+            if normalized_node['child_count'] > 0:
+                child_addr = normalized_node['child_address']
+                print(f"DEBUG - Processing children at address: {child_addr}")
+                self._process_children(root, child_addr, normalized_node['child_count'])
                 
-            if 'name_index' not in raw_node:
-                print(f"Debug - Contenu du nœud: {raw_node}")
-                raise ValueError("Le nœud n'a pas de name_index")
-                
-            if not hasattr(self, '_string_table'):
-                print("Table des chaînes non initialisée")
-                raise ValueError("Table des chaînes manquante")
-                
-            if raw_node['name_index'] < 0 or raw_node['name_index'] >= len(self._string_table):
-                print(f"name_index {raw_node['name_index']} hors limites (max: {len(self._string_table)-1})")
-                raise ValueError(f"name_index invalide: {raw_node['name_index']}")
-                
-            try:
-                name = self._string_table.get_string(raw_node['name_index'])
-                if not name:
-                    raise ValueError(f"name_index invalide: {raw_node['name_index']}")
-                parent_node.name = name
-            except Exception as e:
-                print(f"Avertissement: Impossible de lire le nom du nœud (index={raw_node['name_index']}): {e}")
-                parent_node.name = f"UnknownNode_{raw_node['name_index']}"
-
-            # Validation des adresses et compteurs
-            max_element_index = len(self._attributes) - 1 if self._attributes else 0
-            attr_start = raw_node['attribute_address']['element_index']
-            attr_count = raw_node['attribute_count']
-
-            if attr_start + attr_count > max_element_index:
-                print(f"Avertissement: Nombre d'attributs ajusté de {attr_count} à {max_element_index - attr_start}")
-                attr_count = max(0, max_element_index - attr_start)
-
-            # Lecture des attributs
-            for i in range(attr_count):
-                addr = raw_node['attribute_address']
-                attr_addr = {
-                    'segment_index': addr['segment_index'],
-                    'element_index': addr['element_index'] + i
-                }
-                
-                try:
-                    attr = self._attributes.get_element(attr_addr)
-                    if attr is None:
-                        raise ValueError(f"Attribut non trouvé à l'adresse {attr_addr}")
-
-                    name = self._string_table.get_string(attr['name_index'])
-                    if not name:
-                        raise ValueError(f"Nom d'attribut invalide (index={attr['name_index']})")
-
-                    value = self._process_attribute_value(attr)
-                    parent_node.attributes[name] = value
-                except Exception as e:
-                    print(f"Erreur lors de la lecture de l'attribut {i}: {e}")
-
-            # Validation et lecture des nœuds enfants
-            max_node_index = len(self._nodes) - 1 if self._nodes else 0
-            child_start = raw_node['child_address']['element_index']
-            child_count = raw_node['child_count']
-
-            if child_start + child_count > max_node_index:
-                print(f"Avertissement: Nombre d'enfants ajusté de {child_count} à {max_node_index - child_start}")
-                child_count = max(0, max_node_index - child_start)
-
-            # Lecture des enfants
-            for i in range(child_count):
-                addr = raw_node['child_address']
-                child_addr = {
-                    'segment_index': addr['segment_index'],
-                    'element_index': addr['element_index'] + i
-                }
-                
-                try:
-                    child_raw = self._nodes.get_element(child_addr)
-                    if child_raw is None:
-                        raise ValueError(f"Nœud enfant non trouvé à l'adresse {child_addr}")
-
-                    child_node = DataCenterNode()
-                    self._process_node(child_node, child_raw)
-                    parent_node.children.append(child_node)
-                    child_node.parent = parent_node  # Établir la relation parent-enfant
-                except Exception as e:
-                    print(f"Erreur lors de la lecture du nœud enfant {i} (adresse={child_addr}): {e}")
-
-            # Gestion des clés si présentes
-            if 'keys_info' in raw_node:
-                try:
-                    keys = self._keys.get_keys((raw_node['keys_info'] & 0b1111111111110000) >> 4)
-                    if keys:
-                        parent_node.keys = keys
-                except Exception as e:
-                    print(f"Erreur lors de la lecture des clés: {e}")
+            return root
 
         except Exception as e:
-            print(f"Erreur critique lors du traitement du nœud: {e}")
-            # On conserve le nœud même en cas d'erreur pour maintenir la structure
-            if not parent_node.name:
-                parent_node.name = "ErrorNode"
+            print(f"DEBUG - Error in _build_tree: {str(e)}")
+            raise
+
+
+    def _validate_address(self, addr):
+        """Validate and normalize address"""
+        if not isinstance(addr, dict) or 'segment_index' not in addr or 'element_index' not in addr:
+            return {'segment_index': 0, 'element_index': 0}
+        return {
+            'segment_index': max(0, min(addr['segment_index'], len(self._nodes)-1)),
+            'element_index': max(0, addr['element_index'])
+        }
+
+    def _process_children(self, parent, address, count):
+        """Process child nodes"""
+        print(f"DEBUG - Processing {count} children at {address}")
+        try:
+            for i in range(count):
+                child_index = address['segment_index'] + i
+                if child_index < len(self._nodes):
+                    child_node = self._nodes[child_index]
+                    self._process_node(parent, child_node)
+        except Exception as e:
+            print(f"DEBUG - Error processing children: {e}")
+
+
+    def _get_name(self, name_index):
+        """Get name from name index with validation"""
+        try:
+            if not name_index or name_index <= 0:
+                return None
+                
+            # Check if index is within bounds of string table
+            if name_index >= len(self._strings):
+                print(f"WARNING: Name index {name_index} out of bounds")
+                return None
+                
+            name = self._strings[name_index]
+            print(f"DEBUG - Name lookup: index={name_index}, name={name}")
+            return name
+        except Exception as e:
+            print(f"DEBUG - Error getting name: {str(e)}")
+            return None
+
+    def _process_node(self, parent_node, raw_node):
+        """Process node according to specification"""
+        try:
+            name_index = raw_node.get('name_index')
+            if not name_index or name_index <= 0:
+                print(f"Debug - Invalid name index in node: {raw_node}")
+                return
+
+            node = DataCenterNode(
+                name=self._get_name(name_index),
+                value=raw_node.get('value')
+            )
+
+            attributes = raw_node.get('attributes', [])
+            sorted_attrs = sorted(attributes, key=lambda x: x['name_index'])
+            for attr in sorted_attrs:
+                self._process_attribute(node, attr)
+
+            children = raw_node.get('children', [])
+            for child in children:
+                self._process_node(node, child)
+            node.sort_children()
+
+            parent_node.children.append(node)
+
+        except Exception as e:
+            print(f"Error processing node: {e}")
+            raise
+
+
+    def _process_attribute(self, node, raw_attr):
+        """Process attribute with proper typing"""
+        name_index = raw_attr.get('name_index')
+        if not name_index or name_index <= 0:
+            return
+
+        name = self._get_name(name_index)
+        type_code = raw_attr.get('type_code')
+        value = raw_attr.get('value')
+
+        if name == VALUE_NODE_NAME:
+            if type_code != DataCenterTypeCode.STRING:
+                raise ValueError("__value__ attribute must be string type")
+            node.value = value
+        else:
+            node.attributes[name] = value
+
 
     def _process_attribute_value(self, attr):
         """Traitement de la valeur d'un attribut selon son type"""
